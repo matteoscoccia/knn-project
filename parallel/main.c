@@ -36,7 +36,7 @@ int compare_distances(const void *a, const void *b) {
 }
 
 // Function to find k-nearest neighbors
-void find_k_nearest_neighbors(Point *points, int n, int k, int start, int end) {
+void find_k_nearest_neighbors( FILE *f,Point *points, int n, int k, int start, int end) {
     for (int i = start; i < end; i++) {
         Distance distances[n - 1];
         int count = 0;
@@ -56,11 +56,14 @@ void find_k_nearest_neighbors(Point *points, int n, int k, int start, int end) {
         printf("Process %d, Point %d's %d nearest neighbors:\n", start, i, k);
         for (int m = 0; m < k; m++) {
             printf("Neighbor %d: Point %d (Distance: %f)\n", m + 1, distances[m].index, distances[m].distance);
+            fprintf(f,"Neighbor %d: Point %d (Distance: %f)\n", m + 1, distances[m].index, distances[m].distance);
         }
     }
 }
 
 int main(int argc, char** argv) {
+    FILE *f;
+    f = fopen("output.txt", "a+");
     int rank, size, n = 100, k = 5;
     Point *points = NULL;
 
@@ -90,15 +93,17 @@ int main(int argc, char** argv) {
     double start_time = MPI_Wtime();  // Start measuring parallel time
 
     // Each process finds k-nearest neighbors for its share of points
-    find_k_nearest_neighbors(points, n, k, start, end);
+    find_k_nearest_neighbors(f,points, n, k, start, end);
 
     double end_time = MPI_Wtime();  // End time
     if (rank == 0) {
         printf("Parallel time taken: %f seconds\n", end_time - start_time);
+        fprintf(f,"Parallel time taken: %f seconds\n", end_time - start_time);
     }
 
     free(points);
     MPI_Finalize();
+    fclose(f);
     return 0;
 }
 
