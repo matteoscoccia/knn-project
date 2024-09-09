@@ -36,7 +36,7 @@ int compare_distances(const void *a, const void *b) {
 }
 
 // Function to find k-nearest neighbors
-void find_k_nearest_neighbors(Point *points, int n, int k) {
+void find_k_nearest_neighbors(FILE *f,Point *points, int n, int k) {
     for (int i = 0; i < n; i++) {
         Distance distances[n - 1];
         int count = 0;
@@ -55,13 +55,17 @@ void find_k_nearest_neighbors(Point *points, int n, int k) {
 
         // Output the k-nearest neighbors
         printf("Point %d's %d nearest neighbors:\n", i, k);
+        fprintf(f,"Point %d's %d nearest neighbors:\n", i, k);
         for (int m = 0; m < k; m++) {
             printf("Neighbor %d: Point %d (Distance: %f)\n", m + 1, distances[m].index, distances[m].distance);
+            fprintf(f,"Neighbor %d: Point %d (Distance: %f)\n", m + 1, distances[m].index, distances[m].distance);
         }
     }
 }
 
 int main() {
+    FILE *f;
+    f = fopen("output.txt", "a+");
     int n = 100;  // Number of points
     int k = 5;    // Number of nearest neighbors to find
     Point *points = (Point *)malloc(n * sizeof(Point));
@@ -72,13 +76,15 @@ int main() {
     clock_t start_time = clock();  // Start measuring time
 
     // Find the k-nearest neighbors for all points
-    find_k_nearest_neighbors(points, n, k);
+    find_k_nearest_neighbors(f,points, n, k);
 
     clock_t end_time = clock();  // End time
     double time_taken = (double)(end_time - start_time) / CLOCKS_PER_SEC;
     printf("Time taken (serial): %f seconds\n", time_taken);
+    fprintf(f,"Time taken (serial): %f seconds\n", time_taken);
 
     free(points);
+    fclose(f);
     return 0;
 }
 
