@@ -7,9 +7,10 @@ typedef struct {
     float x, y, z;
 } Point;
 
+//Contiene la distanza dal punto e l'indice del punto
 typedef struct {
     float distance;
-    int index;
+    int neighbor_index;
 } Distance;
 
 // Function to generate random points in a 3D space
@@ -44,7 +45,7 @@ void find_k_nearest_neighbors( FILE *f,Point *points, int n, int k, int start, i
         for (int j = 0; j < n; j++) {
             if (i != j) {
                 distances[count].distance = euclidean_distance(points[i], points[j]);
-                distances[count].index = j;
+                distances[count].neighbor_index = j;
                 count++;
             }
         }
@@ -55,8 +56,8 @@ void find_k_nearest_neighbors( FILE *f,Point *points, int n, int k, int start, i
         // Print the k-nearest neighbors
         printf("Process %d, Point %d's %d nearest neighbors:\n", start, i, k);
         for (int m = 0; m < k; m++) {
-            printf("Neighbor %d: Point %d (Distance: %f)\n", m + 1, distances[m].index, distances[m].distance);
-            fprintf(f,"Neighbor %d: Point %d (Distance: %f)\n", m + 1, distances[m].index, distances[m].distance);
+            printf("Neighbor %d: Point %d (Distance: %f)\n", m + 1, distances[m].neighbor_index, distances[m].distance);
+            fprintf(f,"Neighbor %d: Point %d (Distance: %f)\n", m + 1, distances[m].neighbor_index, distances[m].distance);
         }
     }
 }
