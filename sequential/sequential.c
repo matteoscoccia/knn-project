@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
+#include <string.h>
 
 // Define the structure for a 3D point
 typedef struct {
@@ -15,7 +16,7 @@ typedef struct {
 } NeighborDistance;
 
 // Function to generate random points in a 3D space
-void generate_points(Point *points, int n) {
+void build_dataset(Point *points, int n) {
     for (int i = 0; i < n; i++) {
         points[i].x = ((float) rand() / RAND_MAX) * 100;
         points[i].y = ((float) rand() / RAND_MAX) * 100;
@@ -23,32 +24,17 @@ void generate_points(Point *points, int n) {
     }
 }
 
-// Function to calculate Euclidean distance between two 3D points
 float euclidean_distance(Point p1, Point p2) {
     return sqrt((p2.x - p1.x) * (p2.x - p1.x) + 
                 (p2.y - p1.y) * (p2.y - p1.y) + 
                 (p2.z - p1.z) * (p2.z - p1.z));
 }
 
-// Comparison function for sorting distances using qsort
+
 int compare_distances(const void *a, const void *b) {
     NeighborDistance *d1 = (NeighborDistance *)a;
     NeighborDistance *d2 = (NeighborDistance *)b;
     return (d1->neighbor_distance < d2->neighbor_distance) ? -1 : 1;
-}
-
-void insertion_sort(NeighborDistance *distances, int size) {
-    for (int i = 1; i < size; i++) {
-        NeighborDistance key = distances[i];
-        int j = i - 1;
-
-        // Shift elements of distances[0..i-1], that are greater than key, to one position ahead of their current position
-        while (j >= 0 && distances[j].neighbor_distance > key.neighbor_distance) {
-            distances[j + 1] = distances[j];
-            j = j - 1;
-        }
-        distances[j + 1] = key;
-    }
 }
 
 // Function to find the k-nearest neighbors for each point
@@ -57,74 +43,93 @@ void find_k_nearest_neighbors(FILE *f, Point *points, int n, int k) {
         NeighborDistance distances[n - 1];
         int count = 0;
 
-        // Calculate distances from points[i] to all other points
+        // Compute all the distances from points[i] to all other points
         for (int j = 0; j < n; j++) {
-            if (i != j) {
+            if (i != j) { // Skip the distance with itself
                 distances[count].neighbor_distance = euclidean_distance(points[i], points[j]);
                 distances[count].neighbor_index = j;
                 count++;
             }
         }
 
-        // Sort the distances to find the k-nearest neighbors
+        // Sort the distances
         qsort(distances, n - 1, sizeof(NeighborDistance), compare_distances);
-        //insertion_sort(distances, n - 1);
 
-        // Output the k-nearest neighbors for the current point
         printf("Point %d's %d nearest neighbors:\n", i, k);
-        fprintf(f, "Point %d's %d nearest neighbors:\n", i, k);
         for (int m = 0; m < k; m++) {
             printf("Neighbor %d: Point %d (Distance: %f)\n", m + 1, distances[m].neighbor_index, distances[m].neighbor_distance);
-            fprintf(f, "Neighbor %d: Point %d (Distance: %f)\n", m + 1, distances[m].neighbor_index, distances[m].neighbor_distance);
         }
     }
 }
 
+// Computes the time for a knn search iteration
+double run_knn(Point *points, int n, int k, FILE *f) {
+    clock_t start_time = clock();  // Start time
+
+    find_k_nearest_neighbors(f, points, n, k);
+
+    clock_t end_time = clock();  // End time
+    return (double)(end_time - start_time) / CLOCKS_PER_SEC;
+}
+
 int main(int argc, char *argv[]) {
-    // Check if the number of command-line arguments is correct
-    if (argc != 3) {
-        printf("Please provide the correct parameters. Usage: %s <number_of_points> <number_of_neighbors>\n", argv[0]);
+
+    if (argc < 3 || argc > 4) {
+        printf("Please provide a correct number of parameters\n");
+        printf("Usage: %s <number_of_points> <number_of_neighbors> [-ev]\n");
+        printf("Use [-ev] if you want to run the algorithm in evaluation mode\n");
         return 1;
     }
 
-    // Parse the number of points (n) and number of neighbors (k) from command-line arguments
     int n = atoi(argv[1]);
     int k = atoi(argv[2]);
 
-    // Validate the input values
+    // Validation
     if (n <= 0 || k <= 0 || k >= n) {
         printf("Invalid values: Ensure that n > 0, k > 0, and k < n.\n");
         return 1;
     }
 
+    // Evaluation mode will run the code 5 times
+    int evaluation_mode = (argc == 4 && strcmp(argv[3], "-ev") == 0) ? 1 : 0;
+    int num_iterations = evaluation_mode ? 5 : 1;
+
     FILE *f;
     f = fopen("output.txt", "a+");
     if (f == NULL) {
-        printf("Error opening output file!\n");
+        printf("Error opening output file\n");
         return 1;
     }
 
-    // Allocate memory for the points
+    // Points allocation
     Point *points = (Point *)malloc(n * sizeof(Point));
     if (points == NULL) {
-        printf("Memory allocation failed!\n");
+        printf("Memory allocation failure\n");
         return 1;
     }
 
-    srand(time(NULL));  // Seed for random number generation
-    generate_points(points, n);  // Generate random points
+    fprintf(f, "------------------------------------------------------------------------------------------------------------------\n");
 
-    clock_t start_time = clock();  // Start measuring time
+    double total_time = 0.0;
 
-    // Find the k-nearest neighbors for all points
-    find_k_nearest_neighbors(f, points, n, k);
+    for (int iter = 0; iter < num_iterations; iter++) {
+        srand(time(NULL) + iter);
+        build_dataset(points, n);
 
-    clock_t end_time = clock();  // End time
-    double time_taken = (double)(end_time - start_time) / CLOCKS_PER_SEC;
-    printf("Time taken (serial): %f seconds\n", time_taken);
-    fprintf(f, "Time taken (serial): %f seconds\n", time_taken);
+        double iteration_time = run_knn(points, n, k, f);
+        total_time += iteration_time;
 
-    // Free the allocated memory and close the file
+        printf("Iteration %d time: %f seconds\n", iter + 1, iteration_time);
+        fprintf(f, "%d Points - %d K neighbors - Iteration %d time: %f seconds\n", n, k, iter + 1, iteration_time);
+    }
+
+    // Calculate and print the average time in evaluation mode
+    if (evaluation_mode) {
+        double average_time = total_time / num_iterations;
+        printf("\n%d Points - %d K neighbors - Average time over %d iterations: %f seconds\n", n, k, num_iterations, average_time);
+        fprintf(f, "%d Points - %d K neighbors - Average time over %d iterations: %f seconds\n", n, k, num_iterations, average_time);
+    }
+
     free(points);
     fclose(f);
 
