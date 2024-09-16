@@ -1,0 +1,2 @@
+Parallel time taken: 14.618271 seconds
+16384 Points - 20 K neighbors - Average time over 1 iterations: 14.618271 seconds
