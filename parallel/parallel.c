@@ -15,6 +15,7 @@ typedef struct {
 
 // Function to generate random points in a 3D space
 void generate_points(Point *points, int n) {
+    printf("\n----Generating %d points----\n", n);
     for (int i = 0; i < n; i++) {
         points[i].x = ((float) rand() / RAND_MAX) * 100;
         points[i].y = ((float) rand() / RAND_MAX) * 100;
@@ -34,6 +35,37 @@ int compare_distances(const void *a, const void *b) {
     Distance *d1 = (Distance *)a;
     Distance *d2 = (Distance *)b;
     return (d1->neighbor_distance < d2->neighbor_distance) ? -1 : 1;
+}
+
+// Function to create MPI datatype for Point structure
+void create_mpi_point_type(MPI_Datatype *mpi_point_type) {
+    int block_lengths[3] = {1, 1, 1};  // x, y, z are all floats
+    MPI_Datatype types[3] = {MPI_FLOAT, MPI_FLOAT, MPI_FLOAT};
+    MPI_Aint offsets[3];
+
+    // Calculate offsets of structure members
+    offsets[0] = offsetof(Point, x);
+    offsets[1] = offsetof(Point, y);
+    offsets[2] = offsetof(Point, z);
+
+    // Create MPI datatype for Point structure
+    MPI_Type_create_struct(3, block_lengths, offsets, types, mpi_point_type);
+    MPI_Type_commit(mpi_point_type);
+}
+
+// Function to create MPI datatype for Distance structure
+void create_mpi_distance_type(MPI_Datatype *mpi_distance_type) {
+    int block_lengths[2] = {1, 1};  // 1 float and 1 int
+    MPI_Datatype types[2] = {MPI_FLOAT, MPI_INT};
+    MPI_Aint offsets[2];
+
+    // Calculate offsets of structure members
+    offsets[0] = offsetof(Distance, neighbor_distance);
+    offsets[1] = offsetof(Distance, neighbor_index);
+
+    // Create MPI datatype for Distance structure
+    MPI_Type_create_struct(2, block_lengths, offsets, types, mpi_distance_type);
+    MPI_Type_commit(mpi_distance_type);
 }
 
 // Function to find k-nearest neighbors
@@ -59,11 +91,11 @@ void find_k_nearest_neighbors(Distance *local_results, Point *points, int n, int
             local_results[(i - start) * k + m] = distances[m];            
             printf("Neighbor %d: Point %d (Distance: %f)\n", m + 1, distances[m].neighbor_index, distances[m].neighbor_distance);
         }
-
     }
 }
 
 int main(int argc, char** argv) {
+    printf("\nStarting");
     FILE *f;
     f = fopen("output_parallel.txt", "a+");
     if (f == NULL) {
@@ -76,10 +108,15 @@ int main(int argc, char** argv) {
     Distance *local_results = NULL;
     Distance *global_results = NULL;
     double start_time, end_time, local_time, max_time;
+    MPI_Datatype mpi_distance_type, mpi_point_type;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+    printf("\nSize = %d", size);
+    // Create MPI_Datatype for Distance and Point structs
+    create_mpi_point_type(&mpi_point_type);
+    create_mpi_distance_type(&mpi_distance_type);
 
     // Root process generates points
     if (rank == 0) {
@@ -88,37 +125,35 @@ int main(int argc, char** argv) {
         generate_points(points, n);
     }
 
-    // Broadcast points to all processes
+    // Broadcast points to all processes using mpi_point_type
     if (rank != 0) {
         points = (Point*)malloc(n * sizeof(Point));
     }
-    MPI_Bcast(points, n * sizeof(Point), MPI_BYTE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(points, n, mpi_point_type, 0, MPI_COMM_WORLD);
 
     // Divide the work among processes
     int points_per_process = n / size;
     int start = rank * points_per_process;
     int end = (rank + 1) * points_per_process;
-    if (rank == size - 1) end = n;  // Last process handles remainings
+    if (rank == size - 1) end = n;  // Last process handles remaining points
 
     // Allocate local results array
     local_results = (Distance*)malloc(points_per_process * k * sizeof(Distance));
 
     start_time = MPI_Wtime();  // Start measuring parallel time
 
-    //TODO dichiarare MPI TYPE DISTANCE
-
     // Each process finds k-nearest neighbors for its share of points
     find_k_nearest_neighbors(local_results, points, n, k, start, end);
 
-
-    // Gather results from all processes
+    // Gather results from all processes using mpi_distance_type
     if (rank == 0) {
         global_results = (Distance*)malloc(n * k * sizeof(Distance));
     }
-    MPI_Gather(local_results, points_per_process * k * sizeof(Distance), MPI_BYTE,
-               global_results, points_per_process * k * sizeof(Distance), MPI_BYTE,
+    MPI_Gather(local_results, points_per_process * k, mpi_distance_type,
+               global_results, points_per_process * k, mpi_distance_type,
                0, MPI_COMM_WORLD);
-
+               
+    //TODO
     /*if (rank == size - 1) {
         int remaining_points = n - (size - 1) * points_per_process;
         MPI_Gatherv(local_results, remaining_points * k * sizeof(Distance), MPI_BYTE,
@@ -141,14 +176,20 @@ int main(int argc, char** argv) {
         printf("Parallel time taken: %f seconds\n", max_time);
         fprintf(f, "Parallel time taken: %f seconds\n", max_time);
         
-        printf("\n%d Points - %d K neighbors - Average time over 1 iterations: %f seconds\n", n, k, max_time);
-        fprintf(f, "%d Points - %d K neighbors - Average time over 1 iterations: %f seconds\n", n, k, max_time);
+        printf("\n%d Points - %d K neighbors - Average time over 1 iteration: %f seconds\n", n, k, max_time);
+        fprintf(f, "%d Points - %d K neighbors - Average time over 1 iteration: %f seconds\n", n, k, max_time);
         free(global_results);
     }
 
     free(local_results);
     free(points);
+
+    // Free the custom MPI_Datatypes
+    MPI_Type_free(&mpi_point_type);
+    MPI_Type_free(&mpi_distance_type);
+
     MPI_Finalize();
     fclose(f);
     return 0;
 }
+
