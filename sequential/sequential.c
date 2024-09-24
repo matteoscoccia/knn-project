@@ -4,12 +4,10 @@
 #include <time.h>
 #include <string.h>
 
-// Define the structure for a 3D point
 typedef struct {
     float x, y, z;
 } Point;
 
-// Define the structure for storing the distance and the index of a point
 typedef struct {
     float neighbor_distance;
     int neighbor_index;
