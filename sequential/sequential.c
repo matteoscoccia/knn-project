@@ -95,7 +95,12 @@ int main(int argc, char *argv[]) {
     int num_iterations = evaluation_mode ? 5 : 1;
 
     FILE *f;
-    f = fopen("output.txt", "a+");
+    f = fopen("output.csv", "a+");
+    char buffer[256]; 
+    if (fgets(buffer, sizeof(buffer), f) == NULL) {
+        fprintf(f, "Numero di punti (N),Numero di vicini (K),Iterazioni,Tempo di esecuzione(s)\n");
+    }
+    
     if (f == NULL) {
         printf("Error opening output file\n");
         return 1;
@@ -108,8 +113,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    fprintf(f, "------------------------------------------------------------------------------------------------------------------\n");
-
     double total_time = 0.0;
 
     for (int iter = 0; iter < num_iterations; iter++) {
@@ -120,14 +123,16 @@ int main(int argc, char *argv[]) {
         total_time += iteration_time;
 
         printf("Iteration %d time: %f seconds\n", iter + 1, iteration_time);
-        fprintf(f, "%d Points - %d K neighbors - Iteration %d time: %f seconds\n", n, k, iter + 1, iteration_time);
+        if (evaluation_mode == 0){
+            fprintf(f, "%d,%d,%d,%f\n", n, k, iter + 1, iteration_time);
+        }
     }
 
     // Calculate and print the average time in evaluation mode
     if (evaluation_mode) {
         double average_time = total_time / num_iterations;
         printf("\n%d Points - %d K neighbors - Average time over %d iterations: %f seconds\n", n, k, num_iterations, average_time);
-        fprintf(f, "%d Points - %d K neighbors - Average time over %d iterations: %f seconds\n", n, k, num_iterations, average_time);
+        fprintf(f,"%d,%d,%d,%f\n", n, k, num_iterations, average_time);
     }
 
     free(points);
