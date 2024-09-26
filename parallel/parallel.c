@@ -86,28 +86,26 @@ void find_k_nearest_neighbors(Distance *local_results, Point *points, int n, int
         // Sort distances
         qsort(distances, n - 1, sizeof(Distance), compare_distances);
 
-        printf("Point %d's %d nearest neighbors:\n", i, k);
+        //printf("Point %d's %d nearest neighbors:\n", i, k);
         // Copy the k-nearest neighbors to the local_results array
         for (int m = 0; m < k; m++) {
             local_results[(i - start) * k + m] = distances[m];            
-            printf("Neighbor %d: Point %d (Distance: %f)\n", m + 1, distances[m].neighbor_index, distances[m].neighbor_distance);
+            //printf("Neighbor %d: Point %d (Distance: %f)\n", m + 1, distances[m].neighbor_index, distances[m].neighbor_distance);
         }
     }
 }
 
 int main(int argc, char** argv) {
 
-    if (argc < 4 || argc > 5) {
+    if (argc < 3 || argc > 4) {
         printf("Please provide a correct number of parameters\n");
-        printf("Usage: %s <number_of_points> <number_of_neighbors> [-ev]\n");
+        printf("Usage: <number_of_points> <number_of_neighbors> [-ev]\n");
         printf("Use [-ev] if you want to run the algorithm in evaluation mode\n");
         return 1;
     }
 
-    int p = atoi(argv[1]);
-    int n = atoi(argv[2]);
-    int k = atoi(argv[3]);
-    
+    int n = atoi(argv[1]);
+    int k = atoi(argv[2]);
 
     // Validation
     if (n <= 0 || k <= 0 || k >= n) {
@@ -116,22 +114,11 @@ int main(int argc, char** argv) {
     }
 
     // Evaluation mode will run the code 5 times
-    int evaluation_mode = (argc == 5 && strcmp(argv[4], "-ev") == 0) ? 1 : 0;
+    int evaluation_mode = (argc == 4 && strcmp(argv[3], "-ev") == 0) ? 1 : 0;
     int num_iterations = evaluation_mode ? 5 : 1;
 
     printf("\nStarting");
 
-    FILE *f;
-    f = fopen("output.csv", "a+");
-    char buffer[256]; 
-    if (fgets(buffer, sizeof(buffer), f) == NULL) {
-        fprintf(f, "Numero di processori (P),Numero di punti (N),Numero di vicini (K),Iterazioni,Tempo di esecuzione(s)\n");
-    }
-
-    if (f == NULL) {
-        printf("Error opening output file!\n");
-        return 1;
-    }
 
     int rank, size;
     Point *points = NULL;
@@ -144,6 +131,18 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     printf("\nSize = %d", size);
+    printf("\nN = %d", n);
+    printf("\nP = %d", size);
+    printf("\nK = %d", k);
+    
+    FILE *f;
+    f = fopen("output.csv", "a+");
+    char buffer[256]; 
+
+    if (f == NULL) {
+        printf("Error opening output file!\n");
+        return 1;
+    }
     
 
     // Create MPI_Datatype for Distance and Point structs
@@ -154,79 +153,84 @@ int main(int argc, char** argv) {
    
     for (int iter = 0; iter < num_iterations; iter++) {
     
-    
-    // Root process generates points
-    if (rank == 0) {
-        points = (Point*)malloc(n * sizeof(Point));
-        srand(time(NULL));
-        generate_points(points, n);
-    }
-
-    // Broadcast points to all processes using mpi_point_type
-    if (rank != 0) {
-        points = (Point*)malloc(n * sizeof(Point));
-    }
-    MPI_Bcast(points, n, mpi_point_type, 0, MPI_COMM_WORLD);
-
-    // Divide the work among processes
-    int points_per_process = n / p;
-    int start = rank * points_per_process;
-    int end = (rank + 1) * points_per_process;
-    if (rank == p - 1) end = n;  // Last process handles remaining points
-
-    // Allocate local results array
-    local_results = (Distance*)malloc(points_per_process * k * sizeof(Distance));
-
-    start_time = MPI_Wtime();  // Start measuring parallel time
-
-    // Each process finds k-nearest neighbors for its share of points
-    find_k_nearest_neighbors(local_results, points, n, k, start, end);
-
-    // Gather results from all processes using mpi_distance_type
-    if (rank == 0) {
-        global_results = (Distance*)malloc(n * k * sizeof(Distance));
-    }
-    MPI_Gather(local_results, points_per_process * k, mpi_distance_type,
-               global_results, points_per_process * k, mpi_distance_type,
-               0, MPI_COMM_WORLD);
-               
-    //TODO
-    /*if (rank == p - 1) {
-        int remaining_points = n - (p - 1) * points_per_process;
-        MPI_Gatherv(local_results, remaining_points * k * sizeof(Distance), MPI_BYTE,
-                    global_results, NULL, NULL, MPI_BYTE,
-                    0, MPI_COMM_WORLD);
-    }*/
-
-    end_time = MPI_Wtime();  // End time
-    local_time = end_time - start_time;
-
-    MPI_Reduce(&local_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-
-    if (rank == 0) {
-        for (int i = 0; i < n; i++) {
-            printf("Point %d's %d nearest neighbors:\n", i, k);
-            for (int m = 0; m < k; m++) {
-                printf("Neighbor %d: Point %d (Distance: %f)\n", m + 1, global_results[i * k + m].neighbor_index, global_results[i * k + m].neighbor_distance);
-            }
+        // Root process generates points
+        if (rank == 0) {
+            points = (Point*)malloc(n * sizeof(Point));
+            srand(time(NULL));
+            generate_points(points, n);
         }
-        printf("Parallel time taken: %f seconds\n", max_time);
-        //fprintf(f, "Parallel time taken: %f seconds\n", max_time);
-        //printf("\n%d Points - %d K neighbors - Average time over 1 iteration: %f seconds\n", n, k, max_time);
-        //fprintf(f, "%d Points - %d K neighbors - Average time over 1 iteration: %f seconds\n", n, k, max_time);
 
-        max_time_sum = max_time_sum + max_time;
-        free(global_results);
+        // Broadcast points to all processes using mpi_point_type
+        if (rank != 0) {
+            points = (Point*)malloc(n * sizeof(Point));
+        }
+        MPI_Bcast(points, n, mpi_point_type, 0, MPI_COMM_WORLD);
+
+        // Divide the work among processes
+        int points_per_process = n / size;
+        int start = rank * points_per_process;
+        int end = (rank + 1) * points_per_process;
+        if (rank == size - 1) end = n;  // Last process handles remaining points
+
+        printf("Process %d: points_per_process = %d, start = %d, end = %d\n", rank, points_per_process, start, end);
+
+        // Allocate local results array
+        local_results = (Distance*)malloc(points_per_process * k * sizeof(Distance));
+        printf("Process %d: Allocating memory for local_results[%d]\n", rank, points_per_process * k);
+
+        start_time = MPI_Wtime();  // Start measuring parallel time
+
+        // Each process finds k-nearest neighbors for its share of points
+        find_k_nearest_neighbors(local_results, points, n, k, start, end);
+
+        // Gather results from all processes using mpi_distance_type
+        if (rank == 0) {
+            global_results = (Distance*)malloc(n * k * sizeof(Distance));
+        }
+        MPI_Gather(local_results, points_per_process * k, mpi_distance_type,
+                global_results, points_per_process * k, mpi_distance_type,
+                0, MPI_COMM_WORLD);
+                
+        //TODO
+        /*if (rank == p - 1) {
+            int remaining_points = n - (p - 1) * points_per_process;
+            MPI_Gatherv(local_results, remaining_points * k * sizeof(Distance), MPI_BYTE,
+                        global_results, NULL, NULL, MPI_BYTE,
+                        0, MPI_COMM_WORLD);
+        }*/
+
+        end_time = MPI_Wtime();  // End time
+        local_time = end_time - start_time;
+
+        MPI_Reduce(&local_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+        if (rank == 0) {
+            for (int i = 0; i < n; i++) {
+                printf("Point %d's %d nearest neighbors:\n", i, k);
+                for (int m = 0; m < k; m++) {
+                    printf("Neighbor %d: Point %d (Distance: %f)\n", m + 1, global_results[i * k + m].neighbor_index, global_results[i * k + m].neighbor_distance);
+                }
+            }
+            //printf("Parallel time taken: %f seconds\n", max_time);
+            //fprintf(f, "Parallel time taken: %f seconds\n", max_time);
+            //printf("\n%d Points - %d K neighbors - Average time over 1 iteration: %f seconds\n", n, k, max_time);
+            //fprintf(f, "%d Points - %d K neighbors - Average time over 1 iteration: %f seconds\n", n, k, max_time);
+
+            max_time_sum = max_time_sum + max_time;
+            free(global_results);
+        }
+    
+        free(local_results);
+        free(points);
+
     }
-   
-    free(local_results);
-    free(points);
-
+    if(rank == 0){
+        if (fgets(buffer, sizeof(buffer), f) == NULL) {
+            fprintf(f, "Numero di processori (P),Numero di punti (N),Numero di vicini (K),Iterazioni,Tempo di esecuzione(s)\n");
+        }
+        printf("\n %d Num.Processor -%d Points - %d K neighbors - Average time over %d iterations: %f seconds\n", size, n, k, num_iterations, (max_time_sum/num_iterations));
+        fprintf(f,"%d,%d,%d,%d,%f\n", size, n, k, num_iterations, (max_time_sum/num_iterations));
     }
-
-    printf("\n %d Num.Processor -%d Points - %d K neighbors - Average time over %d iterations: %f seconds\n", p, n, k, num_iterations, max_time);
-    fprintf(f,"%d,%d,%d,%d,%f\n", p,n, k, num_iterations, (max_time_sum/num_iterations));
- 
     // Free the custom MPI_Datatypes
     MPI_Type_free(&mpi_point_type);
     MPI_Type_free(&mpi_distance_type);

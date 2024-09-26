@@ -53,9 +53,9 @@ void find_k_nearest_neighbors(FILE *f, Point *points, int n, int k) {
         // Sort the distances
         qsort(distances, n - 1, sizeof(NeighborDistance), compare_distances);
 
-        printf("Point %d's %d nearest neighbors:\n", i, k);
+        //printf("Point %d's %d nearest neighbors:\n", i, k);
         for (int m = 0; m < k; m++) {
-            printf("Neighbor %d: Point %d (Distance: %f)\n", m + 1, distances[m].neighbor_index, distances[m].neighbor_distance);
+            //printf("Neighbor %d: Point %d (Distance: %f)\n", m + 1, distances[m].neighbor_index, distances[m].neighbor_distance);
         }
     }
 }
@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
 
     if (argc < 3 || argc > 4) {
         printf("Please provide a correct number of parameters\n");
-        printf("Usage: %s <number_of_points> <number_of_neighbors> [-ev]\n");
+        printf("Usage: <number_of_points> <number_of_neighbors> [-ev]\n");
         printf("Use [-ev] if you want to run the algorithm in evaluation mode\n");
         return 1;
     }
