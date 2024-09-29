@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <math.h>
 #include <mpi.h>
-#include <stddef.h>’
+#include <stddef.h>
+#include <string.h>
+#include <time.h>
 
 typedef struct {
     float x, y, z;
@@ -14,7 +16,7 @@ typedef struct {
     int neighbor_index;
 } Distance;
 
-// Function to generate random points in a 3D space
+// Generate random points in a 3D space
 void generate_points(Point *points, int n) {
     printf("\n----Generating %d points----\n", n);
     for (int i = 0; i < n; i++) {
@@ -24,7 +26,6 @@ void generate_points(Point *points, int n) {
     }
 }
 
-// Function to calculate Euclidean distance
 float euclidean_distance(Point p1, Point p2) {
     return sqrt((p2.x - p1.x) * (p2.x - p1.x) + 
                 (p2.y - p1.y) * (p2.y - p1.y) + 
@@ -38,13 +39,13 @@ int compare_distances(const void *a, const void *b) {
     return (d1->neighbor_distance < d2->neighbor_distance) ? -1 : 1;
 }
 
-// Function to create MPI datatype for Point structure
+// Create MPI datatype for Point structure
 void create_mpi_point_type(MPI_Datatype *mpi_point_type) {
     int block_lengths[3] = {1, 1, 1};  // x, y, z are all floats
     MPI_Datatype types[3] = {MPI_FLOAT, MPI_FLOAT, MPI_FLOAT};
     MPI_Aint offsets[3];
 
-    // Calculate offsets of structure members
+    // Offsets of structure members
     offsets[0] = offsetof(Point, x);
     offsets[1] = offsetof(Point, y);
     offsets[2] = offsetof(Point, z);
@@ -54,13 +55,13 @@ void create_mpi_point_type(MPI_Datatype *mpi_point_type) {
     MPI_Type_commit(mpi_point_type);
 }
 
-// Function to create MPI datatype for Distance structure
+// Create MPI datatype for Distance structure
 void create_mpi_distance_type(MPI_Datatype *mpi_distance_type) {
     int block_lengths[2] = {1, 1};  // 1 float and 1 int
     MPI_Datatype types[2] = {MPI_FLOAT, MPI_INT};
     MPI_Aint offsets[2];
 
-    // Calculate offsets of structure members
+    // Offsets of structure members
     offsets[0] = offsetof(Distance, neighbor_distance);
     offsets[1] = offsetof(Distance, neighbor_index);
 
@@ -69,7 +70,7 @@ void create_mpi_distance_type(MPI_Datatype *mpi_distance_type) {
     MPI_Type_commit(mpi_distance_type);
 }
 
-// Function to find k-nearest neighbors
+// Find k-nearest neighbors
 void find_k_nearest_neighbors(Distance *local_results, Point *points, int n, int k, int start, int end) {
     for (int i = start; i < end; i++) {
         Distance distances[n - 1];
@@ -160,7 +161,7 @@ int main(int argc, char** argv) {
             generate_points(points, n);
         }
 
-        // Broadcast points to all processes using mpi_point_type
+        // Broadcast points to all processes
         if (rank != 0) {
             points = (Point*)malloc(n * sizeof(Point));
         }
@@ -174,7 +175,6 @@ int main(int argc, char** argv) {
 
         printf("Process %d: points_per_process = %d, start = %d, end = %d\n", rank, points_per_process, start, end);
 
-        // Allocate local results array
         local_results = (Distance*)malloc(points_per_process * k * sizeof(Distance));
         printf("Process %d: Allocating memory for local_results[%d]\n", rank, points_per_process * k);
 
@@ -183,7 +183,7 @@ int main(int argc, char** argv) {
         // Each process finds k-nearest neighbors for its share of points
         find_k_nearest_neighbors(local_results, points, n, k, start, end);
 
-        // Gather results from all processes using mpi_distance_type
+        // Gather results
         if (rank == 0) {
             global_results = (Distance*)malloc(n * k * sizeof(Distance));
         }

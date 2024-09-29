@@ -19,7 +19,7 @@ typedef struct {
     int neighbor_index;
 } Distance;
 
-// Function to generate random points in a 3D space
+// Generate random points in a 3D space
 void generate_points(Point *points, int num_points) {
     for (int i = 0; i < num_points; i++) {
         points[i].x = ((float) rand() / RAND_MAX) * 100;
@@ -28,7 +28,7 @@ void generate_points(Point *points, int num_points) {
     }
 }
 
-// Function to calculate Euclidean distance
+
 float euclidean_distance(Point *point1, Point *point2) {
     float x = point1->x - point2->x;
     float y = point1->y - point2->y;
@@ -36,13 +36,13 @@ float euclidean_distance(Point *point1, Point *point2) {
     return sqrt(x * x + y * y + z * z);
 }
 
-// Function to create MPI datatype for Point structure
+// Create MPI datatype for Point structure
 void create_mpi_point_type(MPI_Datatype *mpi_point_type) {
-    int block_lengths[3] = {1, 1, 1};  // x, y, z are all floats
+    int block_lengths[3] = {1, 1, 1};
     MPI_Datatype types[3] = {MPI_FLOAT, MPI_FLOAT, MPI_FLOAT};
     MPI_Aint offsets[3];
 
-    // Calculate offsets of structure members
+    // Offsets of structure members
     offsets[0] = offsetof(Point, x);
     offsets[1] = offsetof(Point, y);
     offsets[2] = offsetof(Point, z);
@@ -52,13 +52,13 @@ void create_mpi_point_type(MPI_Datatype *mpi_point_type) {
     MPI_Type_commit(mpi_point_type);
 }
 
-// Function to create MPI datatype for Distance structure
+// Create MPI datatype for Distance structure
 void create_mpi_distance_type(MPI_Datatype *mpi_distance_type) {
     int block_lengths[2] = {1, 1};  // 1 float and 1 int
     MPI_Datatype types[2] = {MPI_FLOAT, MPI_INT};
     MPI_Aint offsets[2];
 
-    // Calculate offsets of structure members
+    // Offsets of structure members
     offsets[0] = offsetof(Distance, neighbor_distance);
     offsets[1] = offsetof(Distance, neighbor_index);
 
@@ -67,7 +67,7 @@ void create_mpi_distance_type(MPI_Datatype *mpi_distance_type) {
     MPI_Type_commit(mpi_distance_type);
 }
 
-// Function to insert a neighbor into the K nearest neighbors list if it is closer
+// Insert a neighbor into the K nearest neighbors list if it is closer
 void insert_distance_if_needed(Distance *nearest_neighbors, int K, Distance new_neighbor) {
     if (new_neighbor.neighbor_distance < nearest_neighbors[K-1].neighbor_distance) {
         nearest_neighbors[K-1] = new_neighbor;
@@ -85,14 +85,14 @@ void insert_distance_if_needed(Distance *nearest_neighbors, int K, Distance new_
     }
 }
 
-// Function to calculate distances and keep K nearest neighbors
+// Calculate distances and keep K nearest neighbors
 void calculate_and_retain_k_nearest(Point *my_points, Point *received_points, 
                                     Distance *local_results, int points_per_process, 
                                     int K, int my_rank, int num_procs) {
     for (int i = 0; i < points_per_process; i++) {
         Distance *nearest_neighbors = &local_results[i * K];
 
-        // Initialize the nearest neighbors array with max distance
+
         for (int k = 0; k < K; k++) {
             nearest_neighbors[k].neighbor_distance = INFINITY;
             nearest_neighbors[k].neighbor_index = -1;
@@ -107,7 +107,6 @@ void calculate_and_retain_k_nearest(Point *my_points, Point *received_points,
                 new_neighbor.neighbor_distance = euclidean_distance(&my_points[i], &received_points[j]);
                 new_neighbor.neighbor_index = global_index;
 
-                // Insert this new neighbor into the K nearest neighbors list if it is closer
                 insert_distance_if_needed(nearest_neighbors, K, new_neighbor);
             }
         }
@@ -160,7 +159,6 @@ int main(int argc, char *argv[]) {
 
     int points_per_process = N / num_procs;
     
-    // Adjust for remainder if N is not exactly divisible by num_procs
     int remainder = N % num_procs;
     if (remainder != 0) {
         if (my_rank == COORDINATOR) {
@@ -187,7 +185,7 @@ int main(int argc, char *argv[]) {
    
     for (int iter = 0; iter < num_iterations; iter++) {
 
-        // Allocate memory for local points and K nearest neighbors
+        // Memory allocation for local points and K nearest neighbors
         my_points = (Point *)malloc(points_per_process * sizeof(Point));
         if (my_points == NULL) {
             printf("Process %d: Failed to allocate memory for my_points.\n", my_rank);
@@ -210,7 +208,7 @@ int main(int argc, char *argv[]) {
             generate_points(points, N);
         }
 
-        // Scatter the points to processes using custom MPI datatype
+        // Scattering the points to processes using custom MPI datatype
         MPI_Scatter(points, points_per_process, mpi_point_type,
                     my_points, points_per_process, mpi_point_type,
                     COORDINATOR, MPI_COMM_WORLD);
@@ -251,13 +249,13 @@ int main(int argc, char *argv[]) {
                 global_results, points_per_process * K, mpi_distance_type,
                 COORDINATOR, MPI_COMM_WORLD);
 
-        // End time for measuring execution time
+
         double end_time = MPI_Wtime();
         double elapsed_time = end_time - start_time;
         MPI_Reduce(&elapsed_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
         max_time_sum = max_time_sum + max_time;
 
-        // Only the coordinator process will print the results
+
         if (my_rank == COORDINATOR) {
             /*for (int i = 0; i < N; i++) {
                 printf("Point %d's %d nearest neighbors:\n", i, K);

@@ -13,7 +13,7 @@ typedef struct {
     int neighbor_index;
 } NeighborDistance;
 
-// Function to generate random points in a 3D space
+// Generate random points in a 3D space
 void build_dataset(Point *points, int n) {
     for (int i = 0; i < n; i++) {
         points[i].x = ((float) rand() / RAND_MAX) * 100;
@@ -35,7 +35,7 @@ int compare_distances(const void *a, const void *b) {
     return (d1->neighbor_distance < d2->neighbor_distance) ? -1 : 1;
 }
 
-// Function to find the k-nearest neighbors for each point
+// Find the k-nearest neighbors for each point
 void find_k_nearest_neighbors(FILE *f, Point *points, int n, int k) {
     for (int i = 0; i < n; i++) {
         NeighborDistance distances[n - 1];
@@ -62,11 +62,11 @@ void find_k_nearest_neighbors(FILE *f, Point *points, int n, int k) {
 
 // Computes the time for a knn search iteration
 double run_knn(Point *points, int n, int k, FILE *f) {
-    clock_t start_time = clock();  // Start time
+    clock_t start_time = clock();
 
     find_k_nearest_neighbors(f, points, n, k);
 
-    clock_t end_time = clock();  // End time
+    clock_t end_time = clock();
     return (double)(end_time - start_time) / CLOCKS_PER_SEC;
 }
 
