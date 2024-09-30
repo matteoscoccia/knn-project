@@ -220,7 +220,8 @@ int main(int argc, char *argv[]) {
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
 
-        // Start time for measuring execution time
+
+        MPI_Barrier(MPI_COMM_WORLD);
         double start_time = MPI_Wtime();
 
         for (int step = 0; step < num_procs; step++) {
@@ -266,7 +267,6 @@ int main(int argc, char *argv[]) {
             printf("\n %d Num.Processor - %d Points - %d K neighbors - Time: %f seconds\n", num_procs, N, K, max_time);
         }
 
-        // Free memory and MPI datatypes
         if (my_rank == COORDINATOR) {
             free(points);
             free(global_results);

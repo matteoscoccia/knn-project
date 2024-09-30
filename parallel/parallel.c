@@ -178,7 +178,8 @@ int main(int argc, char** argv) {
         local_results = (Distance*)malloc(points_per_process * k * sizeof(Distance));
         printf("Process %d: Allocating memory for local_results[%d]\n", rank, points_per_process * k);
 
-        start_time = MPI_Wtime();  // Start measuring parallel time
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
 
         // Each process finds k-nearest neighbors for its share of points
         find_k_nearest_neighbors(local_results, points, n, k, start, end);
@@ -199,7 +200,7 @@ int main(int argc, char** argv) {
                         0, MPI_COMM_WORLD);
         }*/
 
-        end_time = MPI_Wtime();  // End time
+        end_time = MPI_Wtime();
         local_time = end_time - start_time;
 
         MPI_Reduce(&local_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
